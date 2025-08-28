@@ -1,0 +1,249 @@
+{
+  "name": "🚨 Sentiment Alert Sistemi",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "id": "alert-scheduler",
+      "name": "30 Dakikada Bir Kontrol",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [260, 300]
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "url": "http://localhost:8060/api/sentiments/enhanced-stats",
+        "options": {}
+      },
+      "id": "check-sentiment",
+      "name": "Sentiment Durumunu Kontrol Et",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "negative-sentiment-check",
+              "leftValue": "={{ $json.overall_sentiment }}",
+              "rightValue": -0.3,
+              "operator": {
+                "type": "number",
+                "operation": "smaller"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "negative-alert-check",
+      "name": "Negatif Sentiment Yüksek mi?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [660, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "positive-sentiment-check",
+              "leftValue": "={{ $json.overall_sentiment }}",
+              "rightValue": 0.5,
+              "operator": {
+                "type": "number",
+                "operation": "larger"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "positive-alert-check",
+      "name": "Pozitif Sentiment Yüksek mi?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [660, 400]
+    },
+    {
+      "parameters": {
+        "authentication": "generic",
+        "genericAuthType": "httpHeaderAuth",
+        "httpHeaderAuth": {
+          "name": "Authorization",
+          "value": "Bearer DISCORD_BOT_TOKEN"
+        },
+        "httpMethod": "POST",
+        "url": "https://discord.com/api/v9/channels/CHANNEL_ID/messages",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "🚨 **UYARI: Yüksek Negatif Sentiment!**\n\n📉 **Genel Sentiment:** {{ $('Sentiment Durumunu Kontrol Et').item.json.overall_sentiment }}\n📊 **Toplam Analiz:** {{ $('Sentiment Durumunu Kontrol Et').item.json.total_analyzed }}\n⚠️ **En Düşük Takım:** {{ $('Sentiment Durumunu Kontrol Et').item.json.team_comparison.slice(-1)[0].team_name }}\n\n🔍 **Durum:** Taraftarlar arasında olumsuz hava hakim!\n⏰ **Zaman:** {{ $now.format('DD/MM/YYYY HH:mm') }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "discord-negative-alert",
+      "name": "Discord Negatif Uyarı",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [860, 100]
+    },
+    {
+      "parameters": {
+        "authentication": "generic",
+        "genericAuthType": "httpHeaderAuth",
+        "httpHeaderAuth": {
+          "name": "Authorization",
+          "value": "Bearer DISCORD_BOT_TOKEN"
+        },
+        "httpMethod": "POST",
+        "url": "https://discord.com/api/v9/channels/CHANNEL_ID/messages",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "🎉 **HABERLER: Yüksek Pozitif Sentiment!**\n\n📈 **Genel Sentiment:** {{ $('Sentiment Durumunu Kontrol Et').item.json.overall_sentiment }}\n📊 **Toplam Analiz:** {{ $('Sentiment Durumunu Kontrol Et').item.json.total_analyzed }}\n🏆 **En Yüksek Takım:** {{ $('Sentiment Durumunu Kontrol Et').item.json.team_comparison[0].team_name }}\n\n🔥 **Durum:** Taraftarlar çok mutlu ve iyimser!\n⏰ **Zaman:** {{ $now.format('DD/MM/YYYY HH:mm') }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "discord-positive-alert",
+      "name": "Discord Pozitif Haber",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [860, 500]
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "url": "http://localhost:8060/api/sentiments/trends/insights",
+        "options": {}
+      },
+      "id": "get-trends",
+      "name": "Trend İçgörüleri Al",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1060, 300]
+    }
+  ],
+  "connections": {
+    "30 Dakikada Bir Kontrol": {
+      "main": [
+        [
+          {
+            "node": "Sentiment Durumunu Kontrol Et",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sentiment Durumunu Kontrol Et": {
+      "main": [
+        [
+          {
+            "node": "Negatif Sentiment Yüksek mi?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Pozitif Sentiment Yüksek mi?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Negatif Sentiment Yüksek mi?": {
+      "main": [
+        [
+          {
+            "node": "Discord Negatif Uyarı",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Pozitif Sentiment Yüksek mi?": {
+      "main": [
+        [
+          {
+            "node": "Discord Pozitif Haber",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Discord Negatif Uyarı": {
+      "main": [
+        [
+          {
+            "node": "Trend İçgörüleri Al",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Discord Pozitif Haber": {
+      "main": [
+        [
+          {
+            "node": "Trend İçgörüleri Al",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z",
+      "id": "sentiment-alerts",
+      "name": "Sentiment Alerts"
+    }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "versionId": "1"
+}

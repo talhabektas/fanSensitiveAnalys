@@ -1,0 +1,14 @@
+{
+  "build": {
+    "command": "go build -o main ."
+  },
+  "start": {
+    "command": "./main"
+  },
+  "healthcheckPath": "/health",
+  "restartPolicyType": "always",
+  "variables": {
+    "PORT": "8080",
+    "GIN_MODE": "release"
+  }
+}

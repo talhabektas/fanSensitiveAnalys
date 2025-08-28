@@ -1,0 +1,86 @@
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: taraftar-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password123
+      MONGO_INITDB_DATABASE: taraftar_analizi
+    volumes:
+      - mongo_data:/data/db
+      - ./scripts/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+    networks:
+      - taraftar-network
+
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: taraftar-backend
+    restart: unless-stopped
+    ports:
+      - "8060:8060"
+    environment:
+      - PORT=8060
+      - GIN_MODE=release
+      - MONGODB_URI=mongodb://admin:password123@mongodb:27017/taraftar_analizi?authSource=admin
+      - MONGODB_DATABASE=taraftar_analizi
+    env_file:
+      - ./backend/.env
+    depends_on:
+      - mongodb
+    networks:
+      - taraftar-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8060/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: taraftar-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    environment:
+      - VITE_API_URL=http://localhost:8060/api/v1
+    depends_on:
+      - backend
+    networks:
+      - taraftar-network
+
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: taraftar-n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=password123
+      - WEBHOOK_URL=http://localhost:5678
+      - BACKEND_URL=http://backend:8060
+    env_file:
+      - ./n8n.env
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./n8n-workflows:/home/node/.n8n/workflows:ro
+    depends_on:
+      - backend
+    networks:
+      - taraftar-network
+
+volumes:
+  mongo_data:
+  n8n_data:
+
+networks:
+  taraftar-network:
+    driver: bridge

@@ -1,0 +1,426 @@
+{
+  "name": "Sentiment Analyzer",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "sentiment-analysis",
+        "responseMode": "responseNode"
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "sentiment-webhook"
+    },
+    {
+      "parameters": {
+        "url": "={{$env.BACKEND_URL}}/api/v1/comments/unprocessed?limit=50",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "={{$env.API_SECRET}}"
+            }
+          ]
+        }
+      },
+      "name": "Get Unprocessed Comments",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\n\nif (!response.comments || response.comments.length === 0) {\n  return [{ json: { message: 'No unprocessed comments found', stop_execution: true } }];\n}\n\n// Split comments into batches of 10 for API efficiency\nconst comments = response.comments;\nconst batchSize = 10;\nconst batches = [];\n\nfor (let i = 0; i < comments.length; i += batchSize) {\n  const batch = comments.slice(i, i + batchSize);\n  batches.push({\n    batch_id: Math.floor(i / batchSize) + 1,\n    comments: batch,\n    texts: batch.map(comment => comment.text)\n  });\n}\n\nreturn batches.map(batch => ({ json: batch }));"
+      },
+      "name": "Prepare Batches",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.stop_execution}}",
+              "operation": "notEqual",
+              "value2": "true"
+            }
+          ]
+        }
+      },
+      "name": "Check If Should Continue",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        900,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api-inference.huggingface.co/models/savasy/bert-base-turkish-sentiment-cased",
+        "requestMethod": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{$env.HUGGINGFACE_TOKEN}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyContentType": "json",
+        "jsonBody": "={ \"inputs\": $json.texts }"
+      },
+      "name": "HuggingFace Sentiment Analysis",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const batchData = $input.first().json;\nconst sentimentResults = $input.last().json;\n\nif (!sentimentResults || !Array.isArray(sentimentResults)) {\n  console.error('Invalid sentiment results:', sentimentResults);\n  return [];\n}\n\nconst processedComments = [];\n\n// Process each comment with its sentiment result\nbatchData.comments.forEach((comment, index) => {\n  if (sentimentResults[index] && Array.isArray(sentimentResults[index])) {\n    const results = sentimentResults[index];\n    const bestResult = results.reduce((best, current) => \n      current.score > best.score ? current : best\n    );\n    \n    // Normalize label\n    let normalizedLabel = 'NEUTRAL';\n    const label = bestResult.label.toUpperCase();\n    if (label.includes('POSITIVE') || label.includes('POS')) {\n      normalizedLabel = 'POSITIVE';\n    } else if (label.includes('NEGATIVE') || label.includes('NEG')) {\n      normalizedLabel = 'NEGATIVE';\n    }\n    \n    processedComments.push({\n      comment_id: comment.id,\n      team_id: comment.team_id,\n      result: {\n        label: normalizedLabel,\n        score: bestResult.score,\n        confidence: bestResult.score,\n        model_used: 'savasy/bert-base-turkish-sentiment-cased',\n        processed_at: new Date().toISOString()\n      }\n    });\n  }\n});\n\nreturn processedComments.map(comment => ({ json: comment }));"
+      },
+      "name": "Process Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        1340,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json.result.confidence}}",
+              "operation": "largerEqual",
+              "value2": 0.6
+            }
+          ]
+        }
+      },
+      "name": "Check Confidence",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1560,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.BACKEND_URL}}/api/v1/webhook/sentiment",
+        "requestMethod": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-API-Key",
+              "value": "={{$env.API_SECRET}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyContentType": "json",
+        "jsonBody": "={{ $json }}"
+      },
+      "name": "Save High Confidence",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        1780,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.BACKEND_URL}}/api/v1/comments/{{$json.comment_id}}",
+        "requestMethod": "PUT",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-API-Key",
+              "value": "={{$env.API_SECRET}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyContentType": "json",
+        "jsonBody": "={ \"sentiment\": $json.result, \"has_sentiment\": true, \"is_processed\": true }"
+      },
+      "name": "Update Comment",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Log low confidence results for manual review\nconst comment = $input.first().json;\nconsole.log(`Low confidence sentiment for comment ${comment.comment_id}: ${comment.result.label} (${comment.result.confidence})`);\n\n// You could send this to a manual review queue\n// For now, we'll just mark the comment as processed but without high confidence\nreturn {\n  json: {\n    comment_id: comment.comment_id,\n    needs_review: true,\n    confidence: comment.result.confidence,\n    label: comment.result.label\n  }\n};"
+      },
+      "name": "Queue for Review",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        1780,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.BACKEND_URL}}/api/v1/comments/{{$json.comment_id}}",
+        "requestMethod": "PUT",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-API-Key",
+              "value": "={{$env.API_SECRET}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyContentType": "json",
+        "jsonBody": "={ \"is_processed\": true }"
+      },
+      "name": "Mark as Processed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = $input.all();\nconst successful = results.filter(r => r.json && !r.json.error).length;\nconst total = results.length;\n\nconsole.log(`Sentiment analysis batch complete: ${successful}/${total} processed successfully`);\n\nreturn {\n  json: {\n    success: true,\n    batch_processed: total,\n    successful: successful,\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "name": "Log Batch Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        2220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      },
+      "name": "Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        2440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"message\": \"No unprocessed comments found\" }"
+      },
+      "name": "No Comments Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        420
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get Unprocessed Comments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Unprocessed Comments": {
+      "main": [
+        [
+          {
+            "node": "Prepare Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Batches": {
+      "main": [
+        [
+          {
+            "node": "Check If Should Continue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Should Continue": {
+      "main": [
+        [
+          {
+            "node": "HuggingFace Sentiment Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Comments Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HuggingFace Sentiment Analysis": {
+      "main": [
+        [
+          {
+            "node": "Process Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Results": {
+      "main": [
+        [
+          {
+            "node": "Check Confidence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Confidence": {
+      "main": [
+        [
+          {
+            "node": "Save High Confidence",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Queue for Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save High Confidence": {
+      "main": [
+        [
+          {
+            "node": "Update Comment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Comment": {
+      "main": [
+        [
+          {
+            "node": "Log Batch Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Queue for Review": {
+      "main": [
+        [
+          {
+            "node": "Mark as Processed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark as Processed": {
+      "main": [
+        [
+          {
+            "node": "Log Batch Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Batch Results": {
+      "main": [
+        [
+          {
+            "node": "Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {},
+  "id": "2",
+  "tags": [
+    "sentiment-analysis",
+    "ai",
+    "huggingface"
+  ]
+}

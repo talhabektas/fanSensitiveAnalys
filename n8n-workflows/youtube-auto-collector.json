@@ -1,0 +1,219 @@
+{
+  "name": "🚀 Futbol Yorumları Otomatik Toplayıcı",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 2
+            }
+          ]
+        }
+      },
+      "id": "scheduler-node",
+      "name": "Her 2 Saatte Çalıştır",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [260, 300]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "url": "http://localhost:8060/api/youtube/collect-comments",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "youtube-collector",
+      "name": "YouTube Yorumları Topla",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "success-check",
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": 200,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "success-check-node",
+      "name": "Başarılı mı?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "url": "http://localhost:8060/api/sentiments/enhanced-stats",
+        "options": {}
+      },
+      "id": "get-stats",
+      "name": "Son İstatistikleri Al",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [860, 200]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "url": "http://localhost:8060/api/sentiments/summary/generate",
+        "options": {}
+      },
+      "id": "generate-summary",
+      "name": "AI Özeti Oluştur",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [860, 400]
+    },
+    {
+      "parameters": {
+        "authentication": "generic",
+        "genericAuthType": "httpHeaderAuth",
+        "httpHeaderAuth": {
+          "name": "Authorization",
+          "value": "Bearer SLACK_TOKEN_BURAYA"
+        },
+        "httpMethod": "POST",
+        "url": "https://slack.com/api/chat.postMessage",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "channel",
+              "value": "#futbol-analytics"
+            },
+            {
+              "name": "text",
+              "value": "🚀 *Futbol Analizi Tamamlandı!*\n\n📊 *Toplanan Yorumlar:* {{ $('YouTube Yorumları Topla').item.json.total_collected || 0 }}\n📈 *Genel Sentiment:* {{ $('Son İstatistikleri Al').item.json.overall_sentiment || 'N/A' }}\n🎯 *En Aktif Takım:* {{ $('Son İstatistikleri Al').item.json.team_comparison[0].team_name || 'N/A' }}\n\n🤖 *AI Özeti:*\n{{ $('AI Özeti Oluştur').item.json.summary || 'Özet oluşturulamadı' }}\n\n⏰ Analiz Zamanı: {{ $now.format('DD/MM/YYYY HH:mm') }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "slack-notification",
+      "name": "Slack Bildirimi Gönder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1080, 300]
+    },
+    {
+      "parameters": {
+        "fromEmail": "analytics@futbolanaliz.com",
+        "toEmail": "admin@futbolanaliz.com",
+        "subject": "❌ Futbol Analizi Başarısız",
+        "message": "Otomatik futbol yorumu toplama işlemi başarısız oldu.\n\nHata Detayları:\nZaman: {{ $now.format('DD/MM/YYYY HH:mm') }}\nDurum Kodu: {{ $('YouTube Yorumları Topla').item.json.statusCode }}\nHata: {{ $('YouTube Yorumları Topla').item.json.error || 'Bilinmeyen hata' }}\n\nLütfen sistemi kontrol edin.",
+        "options": {}
+      },
+      "id": "error-email",
+      "name": "Hata Email Gönder",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [860, 500]
+    }
+  ],
+  "connections": {
+    "Her 2 Saatte Çalıştır": {
+      "main": [
+        [
+          {
+            "node": "YouTube Yorumları Topla",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "YouTube Yorumları Topla": {
+      "main": [
+        [
+          {
+            "node": "Başarılı mı?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Başarılı mı?": {
+      "main": [
+        [
+          {
+            "node": "Son İstatistikleri Al",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "AI Özeti Oluştur",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Hata Email Gönder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Son İstatistikleri Al": {
+      "main": [
+        [
+          {
+            "node": "Slack Bildirimi Gönder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Özeti Oluştur": {
+      "main": [
+        [
+          {
+            "node": "Slack Bildirimi Gönder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z",
+      "id": "futbol-analytics",
+      "name": "Futbol Analytics"
+    }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "versionId": "1"
+}

@@ -1,0 +1,382 @@
+{
+  "name": "Reddit Comment Collector",
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Start",
+      "type": "n8n-nodes-base.start",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 2
+            }
+          ]
+        }
+      },
+      "name": "Schedule Every 2 Hours",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.reddit.com/api/v1/access_token",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "redditOAuth2Api",
+        "requestMethod": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "TaraftarAnalizi/1.0 by /u/taraftar_bot"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyContentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "grant_type",
+              "value": "password"
+            },
+            {
+              "name": "username",
+              "value": "={{$env.REDDIT_USERNAME}}"
+            },
+            {
+              "name": "password",
+              "value": "={{$env.REDDIT_PASSWORD}}"
+            }
+          ]
+        }
+      },
+      "name": "Reddit OAuth",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        680,
+        300
+      ],
+      "credentials": {
+        "redditOAuth2Api": {
+          "id": "1",
+          "name": "Reddit OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst accessToken = response.access_token;\n\n// Store token for later use\nreturn {\n  access_token: accessToken,\n  expires_at: new Date(Date.now() + (response.expires_in * 1000))\n};"
+      },
+      "name": "Parse Token",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        900,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://oauth.reddit.com/r/galatasaray/hot.json?limit=25",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{$node['Parse Token'].json.access_token}}"
+            },
+            {
+              "name": "User-Agent",
+              "value": "TaraftarAnalizi/1.0 by /u/taraftar_bot"
+            }
+          ]
+        }
+      },
+      "name": "Fetch Galatasaray Posts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://oauth.reddit.com/r/fenerbahce/hot.json?limit=25",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{$node['Parse Token'].json.access_token}}"
+            },
+            {
+              "name": "User-Agent",
+              "value": "TaraftarAnalizi/1.0 by /u/taraftar_bot"
+            }
+          ]
+        }
+      },
+      "name": "Fetch Fenerbahce Posts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://oauth.reddit.com/r/besiktas/hot.json?limit=25",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{$node['Parse Token'].json.access_token}}"
+            },
+            {
+              "name": "User-Agent",
+              "value": "TaraftarAnalizi/1.0 by /u/taraftar_bot"
+            }
+          ]
+        }
+      },
+      "name": "Fetch Besiktas Posts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://oauth.reddit.com/r/trabzonspor/hot.json?limit=25",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{$node['Parse Token'].json.access_token}}"
+            },
+            {
+              "name": "User-Agent",
+              "value": "TaraftarAnalizi/1.0 by /u/taraftar_bot"
+            }
+          ]
+        }
+      },
+      "name": "Fetch Trabzonspor Posts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        540
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const allPosts = [];\nconst turkishWords = ['bu', 'bir', 've', 'de', 'da', 'için', 'ile', 'var', 'yok', 'çok', 'galatasaray', 'fenerbahçe', 'beşiktaş', 'trabzonspor', 'futbol', 'maç', 'takım'];\n\n// Process all subreddit responses\nfor (const item of $input.all()) {\n  const data = item.json.data;\n  if (!data || !data.children) continue;\n  \n  for (const post of data.children) {\n    const postData = post.data;\n    \n    // Skip if no text content\n    if (!postData.selftext || postData.selftext === '[removed]' || postData.selftext === '[deleted]') {\n      continue;\n    }\n    \n    // Check if text contains Turkish words\n    const text = postData.selftext.toLowerCase();\n    const hasTurkishWords = turkishWords.some(word => text.includes(word));\n    \n    if (hasTurkishWords && text.length > 10 && text.length < 5000) {\n      allPosts.push({\n        source_id: postData.id,\n        source: 'reddit',\n        author: postData.author,\n        text: postData.selftext,\n        url: `https://reddit.com${postData.permalink}`,\n        score: postData.score,\n        subreddit: postData.subreddit,\n        language: 'tr',\n        metadata: {\n          platform: 'reddit',\n          post_id: postData.id,\n          is_reply: false,\n          reply_count: postData.num_comments,\n          quality: text.length > 100 ? 'high' : 'medium',\n          tags: ['post', 'selftext'],\n          processed_by: 'n8n_reddit_collector'\n        }\n      });\n    }\n  }\n}\n\nreturn allPosts.map(post => ({ json: post }));"
+      },
+      "name": "Process Comments",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        1340,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.BACKEND_URL}}/api/v1/webhook/comment",
+        "requestMethod": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-API-Key",
+              "value": "={{$env.API_SECRET}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyContentType": "json",
+        "jsonBody": "={{ $json }}"
+      },
+      "name": "Send to Backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = $input.all();\nconst successful = results.filter(item => item.json && !item.json.error).length;\nconst total = results.length;\nconst errors = results.filter(item => item.json && item.json.error);\n\nconsole.log(`Reddit Collection Complete: ${successful}/${total} comments saved`);\n\nif (errors.length > 0) {\n  console.error(`Errors encountered:`, errors.map(e => e.json.error));\n}\n\nreturn {\n  json: {\n    success: true,\n    total_processed: total,\n    successful_saves: successful,\n    errors: errors.length,\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "name": "Log Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        1780,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Schedule Every 2 Hours",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Every 2 Hours": {
+      "main": [
+        [
+          {
+            "node": "Reddit OAuth",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reddit OAuth": {
+      "main": [
+        [
+          {
+            "node": "Parse Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Token": {
+      "main": [
+        [
+          {
+            "node": "Fetch Galatasaray Posts",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Fenerbahce Posts",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Besiktas Posts",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Trabzonspor Posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Galatasaray Posts": {
+      "main": [
+        [
+          {
+            "node": "Process Comments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Fenerbahce Posts": {
+      "main": [
+        [
+          {
+            "node": "Process Comments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Besiktas Posts": {
+      "main": [
+        [
+          {
+            "node": "Process Comments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Trabzonspor Posts": {
+      "main": [
+        [
+          {
+            "node": "Process Comments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Comments": {
+      "main": [
+        [
+          {
+            "node": "Send to Backend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send to Backend": {
+      "main": [
+        [
+          {
+            "node": "Log Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {},
+  "id": "1",
+  "tags": [
+    "reddit",
+    "data-collection",
+    "sentiment-analysis"
+  ]
+}

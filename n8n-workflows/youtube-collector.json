@@ -1,0 +1,397 @@
+{
+  "name": "YouTube Comment Collector",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "cronExpression": "0 6 * * *"
+            }
+          ]
+        }
+      },
+      "name": "Daily at 6 AM",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.googleapis.com/youtube/v3/search",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key",
+              "value": "={{$env.YOUTUBE_API_KEY}}"
+            },
+            {
+              "name": "part",
+              "value": "snippet"
+            },
+            {
+              "name": "q",
+              "value": "galatasaray futbol türkiye"
+            },
+            {
+              "name": "type",
+              "value": "video"
+            },
+            {
+              "name": "maxResults",
+              "value": "10"
+            },
+            {
+              "name": "order",
+              "value": "relevance"
+            },
+            {
+              "name": "publishedAfter",
+              "value": "={{new Date(Date.now() - 24*60*60*1000).toISOString()}}"
+            },
+            {
+              "name": "regionCode",
+              "value": "TR"
+            },
+            {
+              "name": "relevanceLanguage",
+              "value": "tr"
+            }
+          ]
+        }
+      },
+      "name": "Search Galatasaray Videos",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        460,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.googleapis.com/youtube/v3/search",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key",
+              "value": "={{$env.YOUTUBE_API_KEY}}"
+            },
+            {
+              "name": "part",
+              "value": "snippet"
+            },
+            {
+              "name": "q",
+              "value": "fenerbahçe futbol türkiye"
+            },
+            {
+              "name": "type",
+              "value": "video"
+            },
+            {
+              "name": "maxResults",
+              "value": "10"
+            },
+            {
+              "name": "order",
+              "value": "relevance"
+            },
+            {
+              "name": "publishedAfter",
+              "value": "={{new Date(Date.now() - 24*60*60*1000).toISOString()}}"
+            },
+            {
+              "name": "regionCode",
+              "value": "TR"
+            },
+            {
+              "name": "relevanceLanguage",
+              "value": "tr"
+            }
+          ]
+        }
+      },
+      "name": "Search Fenerbahce Videos",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.googleapis.com/youtube/v3/search",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key",
+              "value": "={{$env.YOUTUBE_API_KEY}}"
+            },
+            {
+              "name": "part",
+              "value": "snippet"
+            },
+            {
+              "name": "q",
+              "value": "beşiktaş futbol türkiye"
+            },
+            {
+              "name": "type",
+              "value": "video"
+            },
+            {
+              "name": "maxResults",
+              "value": "10"
+            },
+            {
+              "name": "order",
+              "value": "relevance"
+            },
+            {
+              "name": "publishedAfter",
+              "value": "={{new Date(Date.now() - 24*60*60*1000).toISOString()}}"
+            },
+            {
+              "name": "regionCode",
+              "value": "TR"
+            },
+            {
+              "name": "relevanceLanguage",
+              "value": "tr"
+            }
+          ]
+        }
+      },
+      "name": "Search Besiktas Videos",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        460,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const allVideos = [];\nconst turkishSportsChannels = [\n  'UCqLpYKo6PqdKZhX0aErrq_w', // beIN SPORTS Türkiye\n  'UCDlGHEZKT9R8J2W5LNyFj2A', // A Spor\n  'UCeqLpYKo6PqdKZhX0aErrq_w', // TRT Spor\n  'UCDe8NTa1fYCO5j48J3QHNKw'  // ESPN Türkiye\n];\n\n// Process all search results\nfor (const item of $input.all()) {\n  const data = item.json;\n  if (!data || !data.items) continue;\n  \n  for (const video of data.items) {\n    const snippet = video.snippet;\n    \n    // Filter for Turkish sports channels or Turkish content\n    const isTurkishChannel = turkishSportsChannels.includes(snippet.channelId);\n    const hasTurkishTitle = /[çğıöşüÇĞIİÖŞÜ]/.test(snippet.title);\n    const hasTurkishDescription = /[çğıöşüÇĞIİÖŞÜ]/.test(snippet.description || '');\n    \n    if (isTurkishChannel || hasTurkishTitle || hasTurkishDescription) {\n      allVideos.push({\n        videoId: video.id.videoId,\n        title: snippet.title,\n        channelTitle: snippet.channelTitle,\n        channelId: snippet.channelId,\n        publishedAt: snippet.publishedAt,\n        description: snippet.description\n      });\n    }\n  }\n}\n\nreturn allVideos.map(video => ({ json: video }));"
+      },
+      "name": "Filter Turkish Videos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.googleapis.com/youtube/v3/commentThreads",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key",
+              "value": "={{$env.YOUTUBE_API_KEY}}"
+            },
+            {
+              "name": "part",
+              "value": "snippet"
+            },
+            {
+              "name": "videoId",
+              "value": "={{$json.videoId}}"
+            },
+            {
+              "name": "maxResults",
+              "value": "50"
+            },
+            {
+              "name": "order",
+              "value": "relevance"
+            },
+            {
+              "name": "textFormat",
+              "value": "plainText"
+            }
+          ]
+        }
+      },
+      "name": "Get Video Comments",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        900,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const videoData = $input.first().json;\nconst commentsResponse = $input.last().json;\n\nif (!commentsResponse.items) {\n  return [];\n}\n\nconst processedComments = [];\nconst turkishWords = ['bu', 'bir', 've', 'de', 'da', 'için', 'ile', 'var', 'yok', 'çok', 'galatasaray', 'fenerbahçe', 'beşiktaş', 'trabzonspor', 'futbol', 'maç', 'takım', 'oyuncu', 'gol'];\n\nfor (const item of commentsResponse.items) {\n  const comment = item.snippet.topLevelComment.snippet;\n  const text = comment.textDisplay.toLowerCase();\n  \n  // Check if comment contains Turkish words\n  const hasTurkishWords = turkishWords.some(word => text.includes(word));\n  const hasTurkishChars = /[çğıöşüÇĞIİÖŞÜ]/.test(comment.textDisplay);\n  \n  if ((hasTurkishWords || hasTurkishChars) && text.length > 10 && text.length < 1000) {\n    // Detect team from comment text\n    let detectedTeam = null;\n    if (text.includes('galatasaray') || text.includes('gala') || text.includes('gs')) {\n      detectedTeam = 'galatasaray';\n    } else if (text.includes('fenerbahçe') || text.includes('fener') || text.includes('fb')) {\n      detectedTeam = 'fenerbahce';\n    } else if (text.includes('beşiktaş') || text.includes('bjk')) {\n      detectedTeam = 'besiktas';\n    } else if (text.includes('trabzonspor') || text.includes('trabzon') || text.includes('ts')) {\n      detectedTeam = 'trabzonspor';\n    }\n    \n    processedComments.push({\n      source_id: comment.id || item.id,\n      source: 'youtube',\n      author: comment.authorDisplayName,\n      text: comment.textDisplay,\n      url: `https://www.youtube.com/watch?v=${videoData.videoId}&lc=${comment.id || item.id}`,\n      score: comment.likeCount || 0,\n      language: 'tr',\n      metadata: {\n        platform: 'youtube',\n        video_id: videoData.videoId,\n        video_title: videoData.title,\n        channel_title: videoData.channelTitle,\n        channel_id: videoData.channelId,\n        is_reply: false,\n        like_count: comment.likeCount || 0,\n        published_at: comment.publishedAt,\n        quality: text.length > 50 ? 'high' : 'medium',\n        tags: ['youtube', 'comment'],\n        detected_team: detectedTeam,\n        processed_by: 'n8n_youtube_collector'\n      }\n    });\n  }\n}\n\nreturn processedComments.map(comment => ({ json: comment }));"
+      },
+      "name": "Process Comments",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.BACKEND_URL}}/api/v1/webhook/comment",
+        "requestMethod": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-API-Key",
+              "value": "={{$env.API_SECRET}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyContentType": "json",
+        "jsonBody": "={{ $json }}"
+      },
+      "name": "Send to Backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = $input.all();\nconst successful = results.filter(item => item.json && !item.json.error).length;\nconst total = results.length;\nconst errors = results.filter(item => item.json && item.json.error);\n\nconsole.log(`YouTube Collection Complete: ${successful}/${total} comments saved`);\n\nif (errors.length > 0) {\n  console.error(`Errors encountered:`, errors.map(e => e.json.error));\n}\n\nreturn {\n  json: {\n    success: true,\n    total_processed: total,\n    successful_saves: successful,\n    errors: errors.length,\n    source: 'youtube',\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "name": "Log Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        1560,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Daily at 6 AM": {
+      "main": [
+        [
+          {
+            "node": "Search Galatasaray Videos",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Search Fenerbahce Videos",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Search Besiktas Videos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Galatasaray Videos": {
+      "main": [
+        [
+          {
+            "node": "Filter Turkish Videos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Fenerbahce Videos": {
+      "main": [
+        [
+          {
+            "node": "Filter Turkish Videos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Besiktas Videos": {
+      "main": [
+        [
+          {
+            "node": "Filter Turkish Videos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Turkish Videos": {
+      "main": [
+        [
+          {
+            "node": "Get Video Comments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Video Comments": {
+      "main": [
+        [
+          {
+            "node": "Process Comments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Comments": {
+      "main": [
+        [
+          {
+            "node": "Send to Backend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send to Backend": {
+      "main": [
+        [
+          {
+            "node": "Log Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {},
+  "id": "3",
+  "tags": [
+    "youtube",
+    "data-collection",
+    "comments"
+  ]
+}

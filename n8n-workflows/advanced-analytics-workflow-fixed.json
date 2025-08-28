@@ -1,0 +1,171 @@
+{
+  "name": "🔬 Gelişmiş Analytics Otomasyonu",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      },
+      "id": "analytics-scheduler",
+      "name": "6 Saatte Bir Analiz",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [260, 300]
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "url": "http://localhost:8060/api/n8n/sentiment-status",
+        "options": {}
+      },
+      "id": "get-current-stats",
+      "name": "Mevcut İstatistikleri Al",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "url": "http://localhost:8060/api/n8n/performance-report",
+        "options": {}
+      },
+      "id": "get-performance",
+      "name": "Performans Raporu Al",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "alert-check",
+              "leftValue": "={{ $json.alerts.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "larger"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "has-alerts-check",
+      "name": "Uyarı Var mı?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [880, 200]
+    },
+    {
+      "parameters": {
+        "fromEmail": "system@fansensitive.com",
+        "toEmail": "admin@fansensitive.com",
+        "subject": "🚨 FanSensitive Analytics Uyarısı",
+        "message": "Kritik durum tespit edildi:\n\n{{ $('Performans Raporu Al').item.json.alerts.join('\\n') }}\n\nPerformans Skoru: {{ $('Performans Raporu Al').item.json.performance_score }}/100\n\nZaman: {{ $now.format('DD/MM/YYYY HH:mm') }}",
+        "options": {}
+      },
+      "id": "email-alert",
+      "name": "Email Uyarısı Gönder",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [1080, 100]
+    },
+    {
+      "parameters": {
+        "fromEmail": "system@fansensitive.com",
+        "toEmail": "admin@fansensitive.com",
+        "subject": "📊 FanSensitive 6 Saatlik Rapor",
+        "message": "Analytics Raporu:\n\nPerformans: {{ $('Performans Raporu Al').item.json.performance_score }}/100\nAnaliz Edilen: {{ $('Performans Raporu Al').item.json.stats_summary.total_analyzed }}\nGenel Sentiment: {{ ($('Performans Raporu Al').item.json.stats_summary.overall_sentiment * 100).toFixed(1) }}%\n\nZaman: {{ $now.format('DD/MM/YYYY HH:mm') }}",
+        "options": {}
+      },
+      "id": "regular-report",
+      "name": "Düzenli Rapor Gönder",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [1080, 400]
+    }
+  ],
+  "connections": {
+    "6 Saatte Bir Analiz": {
+      "main": [
+        [
+          {
+            "node": "Mevcut İstatistikleri Al",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mevcut İstatistikleri Al": {
+      "main": [
+        [
+          {
+            "node": "Performans Raporu Al",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Performans Raporu Al": {
+      "main": [
+        [
+          {
+            "node": "Uyarı Var mı?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Düzenli Rapor Gönder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Uyarı Var mı?": {
+      "main": [
+        [
+          {
+            "node": "Email Uyarısı Gönder",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z",
+      "id": "advanced-analytics",
+      "name": "Advanced Analytics"
+    }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "versionId": "1"
+}

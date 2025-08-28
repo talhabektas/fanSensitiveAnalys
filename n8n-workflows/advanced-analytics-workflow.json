@@ -1,0 +1,74 @@
+{
+  "name": "🔬 Gelişmiş Analytics Otomasyonu",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      },
+      "id": "analytics-scheduler",
+      "name": "6 Saatte Bir Analiz",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [260, 300]
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "url": "http://localhost:8060/api/sentiments/enhanced-stats",
+        "options": {}
+      },
+      "id": "get-current-stats",
+      "name": "Mevcut İstatistikleri Al",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "url": "http://localhost:8060/api/sentiments/summary/generate",
+        "options": {}
+      },
+      "id": "generate-ai-summary",
+      "name": "AI Özeti Oluştur",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 200]
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "url": "http://localhost:8060/api/sentiments/trends/insights",
+        "options": {}
+      },
+      "id": "get-trends",
+      "name": "Trend Analizi Yap",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Kapsamlı analiz raporu oluştur\nconst stats = $('Mevcut İstatistikleri Al').item.json;\nconst summary = $('AI Özeti Oluştur').item.json;\nconst trends = $('Trend Analizi Yap').item.json;\n\n// Performance metrikleri hesapla\nconst totalAnalyzed = stats.total_analyzed || 0;\nconst overallSentiment = stats.overall_sentiment || 0;\nconst confidenceAvg = stats.confidence_stats?.average_confidence || 0;\n\n// Takım performans sıralaması\nconst teamRankings = (stats.team_comparison || []).map((team, index) => ({\n  rank: index + 1,\n  name: team.team_name,\n  sentiment: team.avg_sentiment,\n  comments: team.total_comments,\n  trend: team.avg_sentiment > 0.1 ? 'yükseliş' : team.avg_sentiment < -0.1 ? 'düşüş' : 'stabil'\n}));\n\n// Kategori istatistikleri\nconst topCategories = (stats.category_breakdown || []).slice(0, 5).map(cat => ({\n  category: cat.category,\n  percentage: cat.percentage,\n  count: cat.count,\n  sentiment: cat.avg_sentiment\n}));\n\n// Toksiklik analizi\nconst toxicityAnalysis = {\n  total_scanned: stats.toxicity_stats?.total_scanned || 0,\n  high_toxicity: stats.toxicity_stats?.high_toxicity || 0,\n  average_toxicity: stats.toxicity_stats?.average_toxicity || 0,\n  toxicity_percentage: stats.toxicity_stats?.total_scanned > 0 ? \n    (stats.toxicity_stats.high_toxicity / stats.toxicity_stats.total_scanned * 100).toFixed(1) : 0\n};\n\n// Model performansı\nconst modelPerformance = Object.entries(stats.model_performance || {}).map(([model, perf]) => ({\n  model: model,\n  processed: perf.total_processed,\n  avg_time: perf.average_time,\n  success_rate: perf.success_rate,\n  confidence: perf.average_confidence\n}));\n\n// Uyarı sistemini kontrol et\nconst alerts = [];\nif (overallSentiment < -0.4) alerts.push('🚨 Kritik negatif sentiment!');\nif (toxicityAnalysis.toxicity_percentage > 15) alerts.push('⚠️ Yüksek toksiklik oranı!');\nif (confidenceAvg < 0.6) alerts.push('📊 Düşük güven seviyesi!');\n\nreturn {\n  analysis_timestamp: new Date().toISOString(),\n  summary: {\n    total_analyzed: totalAnalyzed,\n    overall_sentiment: overallSentiment,\n    confidence_average: confidenceAvg\n  },\n  team_rankings: teamRankings,\n  top_categories: topCategories,\n  toxicity_analysis: toxicityAnalysis,\n  model_performance: modelPerformance,\n  alerts: alerts,\n  ai_summary: summary.summary || 'Özet oluşturulamadı',\n  trend_insights: trends || [],\n  performance_score: calculatePerformanceScore(overallSentiment, confidenceAvg, toxicityAnalysis.average_toxicity)\n};\n\nfunction calculatePerformanceScore(sentiment, confidence, toxicity) {\n  // 0-100 arası performans skoru hesapla\n  let score = 50; // Başlangıç skoru\n  \n  // Sentiment etkisi\n  score += (sentiment * 30);\n  \n  // Güven seviyesi etkisi\n  score += (confidence * 20);\n  \n  // Toksiklik cezası\n  score -= (toxicity * 30);\n  \n  return Math.max(0, Math.min(100, Math.round(score)));\n}"
+      },
+      "id": "comprehensive-analysis",
+      "name": "Kapsamlı Analiz Oluştur",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },\n          \"conditions\": [\n            {\n              \"id\": \"alert-check\",\n              \"leftValue\": \"={{ $json.alerts.length }}\",\n              \"rightValue\": 0,\n              \"operator\": {\n                \"type\": \"number\",\n                \"operation\": \"larger\"\n              }\n            }\n          ],\n          \"combinator\": \"and\"\n        },\n        \"options\": {}\n      },\n      \"id\": \"has-alerts-check\",\n      \"name\": \"Uyarı Var mı?\",\n      \"type\": \"n8n-nodes-base.if\",\n      \"typeVersion\": 2,\n      \"position\": [880, 200]\n    },\n    {\n      \"parameters\": {\n        \"authentication\": \"generic\",\n        \"genericAuthType\": \"httpHeaderAuth\",\n        \"httpHeaderAuth\": {\n          \"name\": \"Authorization\",\n          \"value\": \"Bearer DISCORD_BOT_TOKEN\"\n        },\n        \"httpMethod\": \"POST\",\n        \"url\": \"https://discord.com/api/v9/channels/CHANNEL_ID/messages\",\n        \"sendBody\": true,\n        \"bodyParameters\": {\n          \"parameters\": [\n            {\n              \"name\": \"content\",\n              \"value\": \"🔬 **Gelişmiş Analytics Raporu**\\n\\n{{ $('Kapsamlı Analiz Oluştur').item.json.alerts.join('\\n') }}\\n\\n📊 **Performans Skoru:** {{ $('Kapsamlı Analiz Oluştur').item.json.performance_score }}/100\\n\\n🏆 **En İyi Takım:** {{ $('Kapsamlı Analiz Oluştur').item.json.team_rankings[0]?.name }}\\n📉 **En Düşük:** {{ $('Kapsamlı Analiz Oluştur').item.json.team_rankings.slice(-1)[0]?.name }}\\n\\n🤖 **AI Özeti:**\\n{{ $('Kapsamlı Analiz Oluştur').item.json.ai_summary?.slice(0, 200) }}...\\n\\n⏰ {{ $now.format('DD/MM/YYYY HH:mm') }}\"\n            }\n          ]\n        },\n        \"options\": {}\n      },\n      \"id\": \"discord-alert-notification\",\n      \"name\": \"Discord Uyarı Bildirimi\",\n      \"type\": \"n8n-nodes-base.httpRequest\",\n      \"typeVersion\": 4.1,\n      \"position\": [1080, 100]\n    },\n    {\n      \"parameters\": {\n        \"authentication\": \"generic\",\n        \"genericAuthType\": \"httpHeaderAuth\",\n        \"httpHeaderAuth\": {\n          \"name\": \"Authorization\",\n          \"value\": \"Bearer SLACK_TOKEN\"\n        },\n        \"httpMethod\": \"POST\",\n        \"url\": \"https://slack.com/api/chat.postMessage\",\n        \"sendBody\": true,\n        \"bodyParameters\": {\n          \"parameters\": [\n            {\n              \"name\": \"channel\",\n              \"value\": \"#analytics\"\n            },\n            {\n              \"name\": \"text\",\n              \"value\": \"📈 **6 Saatlik Analytics Raporu**\\n\\n🎯 **Performans:** {{ $('Kapsamlı Analiz Oluştur').item.json.performance_score }}/100\\n📊 **Analiz Edilen:** {{ $('Kapsamlı Analiz Oluştur').item.json.summary.total_analyzed }}\\n💫 **Genel Sentiment:** {{ ($('Kapsamlı Analiz Oluştur').item.json.summary.overall_sentiment * 100).toFixed(1) }}%\\n🔥 **En Aktif Kategori:** {{ $('Kapsamlı Analiz Oluştur').item.json.top_categories[0]?.category }}\\n\\n🏆 **Takım Sıralaması:**\\n{{ $('Kapsamlı Analiz Oluştur').item.json.team_rankings.slice(0, 3).map(t => `${t.rank}. ${t.name}: ${(t.sentiment * 100).toFixed(0)}%`).join('\\n') }}\\n\\n⏰ {{ $now.format('DD/MM/YYYY HH:mm') }}\"\n            }\n          ]\n        },\n        \"options\": {}\n      },\n      \"id\": \"slack-regular-report\",\n      \"name\": \"Slack Düzenli Rapor\",\n      \"type\": \"n8n-nodes-base.httpRequest\",\n      \"typeVersion\": 4.1,\n      \"position\": [1080, 400]\n    }\n  ],\n  \"connections\": {\n    \"6 Saatte Bir Analiz\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Mevcut İstatistikleri Al\",\n            \"type\": \"main\",\n            \"index\": 0\n          },\n          {\n            \"node\": \"AI Özeti Oluştur\",\n            \"type\": \"main\",\n            \"index\": 0\n          },\n          {\n            \"node\": \"Trend Analizi Yap\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    },\n    \"Mevcut İstatistikleri Al\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Kapsamlı Analiz Oluştur\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    },\n    \"AI Özeti Oluştur\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Kapsamlı Analiz Oluştur\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    },\n    \"Trend Analizi Yap\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Kapsamlı Analiz Oluştur\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    },\n    \"Kapsamlı Analiz Oluştur\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Uyarı Var mı?\",\n            \"type\": \"main\",\n            \"index\": 0\n          },\n          {\n            \"node\": \"Slack Düzenli Rapor\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    },\n    \"Uyarı Var mı?\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Discord Uyarı Bildirimi\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ],\n        []\n      ]\n    }\n  },\n  \"pinData\": {},\n  \"settings\": {\n    \"executionOrder\": \"v1\"\n  },\n  \"staticData\": null,\n  \"tags\": [\n    {\n      \"createdAt\": \"2024-01-01T00:00:00.000Z\",\n      \"updatedAt\": \"2024-01-01T00:00:00.000Z\",\n      \"id\": \"advanced-analytics\",\n      \"name\": \"Advanced Analytics\"\n    }\n  ],\n  \"triggerCount\": 0,\n  \"updatedAt\": \"2024-01-01T00:00:00.000Z\",\n  \"versionId\": \"1\"\n}"

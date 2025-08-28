@@ -1,0 +1,306 @@
+{
+  "name": "Daily Report Generator",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "cronExpression": "0 8 * * *"
+            }
+          ]
+        }
+      },
+      "name": "Daily at 8 AM",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.BACKEND_URL}}/api/v1/dashboard/stats",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "={{$env.API_SECRET}}"
+            }
+          ]
+        }
+      },
+      "name": "Get Overall Stats",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        460,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.BACKEND_URL}}/api/v1/dashboard/comparison",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "={{$env.API_SECRET}}"
+            }
+          ]
+        }
+      },
+      "name": "Get Team Comparison",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.BACKEND_URL}}/api/v1/comments/stats",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "={{$env.API_SECRET}}"
+            }
+          ]
+        }
+      },
+      "name": "Get Comment Stats",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        460,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const overallStats = $input.all()[0].json;\nconst teamComparison = $input.all()[1].json;\nconst commentStats = $input.all()[2].json;\n\nconst today = new Date();\nconst yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);\n\n// Generate HTML report\nconst htmlReport = `\n<!DOCTYPE html>\n<html lang=\"tr\">\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n    <title>Taraftar Duygu Analizi - Günlük Rapor</title>\n    <style>\n        body {\n            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;\n            line-height: 1.6;\n            color: #333;\n            max-width: 800px;\n            margin: 0 auto;\n            padding: 20px;\n            background-color: #f5f5f5;\n        }\n        .container {\n            background: white;\n            padding: 30px;\n            border-radius: 8px;\n            box-shadow: 0 2px 10px rgba(0,0,0,0.1);\n        }\n        h1 {\n            color: #2c3e50;\n            text-align: center;\n            border-bottom: 3px solid #3498db;\n            padding-bottom: 10px;\n        }\n        h2 {\n            color: #34495e;\n            margin-top: 30px;\n        }\n        .stats-grid {\n            display: grid;\n            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));\n            gap: 20px;\n            margin: 20px 0;\n        }\n        .stat-card {\n            background: #f8f9fa;\n            padding: 20px;\n            border-radius: 6px;\n            text-align: center;\n            border-left: 4px solid #3498db;\n        }\n        .stat-number {\n            font-size: 2em;\n            font-weight: bold;\n            color: #2c3e50;\n        }\n        .stat-label {\n            color: #7f8c8d;\n            margin-top: 5px;\n        }\n        .team-list {\n            list-style: none;\n            padding: 0;\n        }\n        .team-item {\n            background: #f8f9fa;\n            margin: 10px 0;\n            padding: 15px;\n            border-radius: 6px;\n            display: flex;\n            justify-content: space-between;\n            align-items: center;\n        }\n        .positive { color: #27ae60; }\n        .negative { color: #e74c3c; }\n        .neutral { color: #7f8c8d; }\n        .footer {\n            text-align: center;\n            margin-top: 30px;\n            padding-top: 20px;\n            border-top: 1px solid #ecf0f1;\n            color: #7f8c8d;\n        }\n    </style>\n</head>\n<body>\n    <div class=\"container\">\n        <h1>📊 Günlük Taraftar Duygu Analizi Raporu</h1>\n        <p style=\"text-align: center; color: #7f8c8d;\">\n            ${today.toLocaleDateString('tr-TR', { \n                weekday: 'long', \n                year: 'numeric', \n                month: 'long', \n                day: 'numeric' \n            })}\n        </p>\n\n        <h2>📈 Genel İstatistikler</h2>\n        <div class=\"stats-grid\">\n            <div class=\"stat-card\">\n                <div class=\"stat-number\">${(commentStats?.total_comments || 0).toLocaleString()}</div>\n                <div class=\"stat-label\">Toplam Yorum</div>\n            </div>\n            <div class=\"stat-card\">\n                <div class=\"stat-number\">${(overallStats?.total_analyzed || 0).toLocaleString()}</div>\n                <div class=\"stat-label\">Analiz Edilen</div>\n            </div>\n            <div class=\"stat-card\">\n                <div class=\"stat-number\">${((overallStats?.overall_sentiment || 0.5) * 100).toFixed(0)}%</div>\n                <div class=\"stat-label\">Genel Duygu Skoru</div>\n            </div>\n            <div class=\"stat-card\">\n                <div class=\"stat-number\">${(commentStats?.unprocessed_comments || 0).toLocaleString()}</div>\n                <div class=\"stat-label\">İşlenmemiş Yorum</div>\n            </div>\n        </div>\n\n        <h2>🏆 Takım Sıralaması</h2>\n        <ul class=\"team-list\">\n            ${(teamComparison?.teams || []).slice(0, 5).map((team, index) => `\n                <li class=\"team-item\">\n                    <span>\n                        <strong>#${index + 1} ${team.team_name}</strong>\n                        <br>\n                        <small>${team.total_comments} yorum</small>\n                    </span>\n                    <span class=\"${team.avg_sentiment >= 0.6 ? 'positive' : team.avg_sentiment <= 0.4 ? 'negative' : 'neutral'}\">\n                        ${(team.avg_sentiment * 100).toFixed(0)}%\n                    </span>\n                </li>\n            `).join('')}\n        </ul>\n\n        <h2>🎭 Duygu Dağılımı</h2>\n        <div class=\"stats-grid\">\n            <div class=\"stat-card\">\n                <div class=\"stat-number positive\">${(overallStats?.sentiment_breakdown?.POSITIVE || 0).toLocaleString()}</div>\n                <div class=\"stat-label\">Pozitif</div>\n            </div>\n            <div class=\"stat-card\">\n                <div class=\"stat-number neutral\">${(overallStats?.sentiment_breakdown?.NEUTRAL || 0).toLocaleString()}</div>\n                <div class=\"stat-label\">Nötr</div>\n            </div>\n            <div class=\"stat-card\">\n                <div class=\"stat-number negative\">${(overallStats?.sentiment_breakdown?.NEGATIVE || 0).toLocaleString()}</div>\n                <div class=\"stat-label\">Negatif</div>\n            </div>\n        </div>\n\n        <h2>📊 Kaynak Dağılımı</h2>\n        <div class=\"stats-grid\">\n            ${Object.entries(commentStats?.source_breakdown || {}).map(([source, count]) => `\n                <div class=\"stat-card\">\n                    <div class=\"stat-number\">${count.toLocaleString()}</div>\n                    <div class=\"stat-label\">${source.charAt(0).toUpperCase() + source.slice(1)}</div>\n                </div>\n            `).join('')}\n        </div>\n\n        <div class=\"footer\">\n            <p>🤖 Bu rapor otomatik olarak oluşturulmuştur.</p>\n            <p>Taraftar Duygu Analizi Sistemi © ${today.getFullYear()}</p>\n        </div>\n    </div>\n</body>\n</html>\n`;\n\n// Also create a simple JSON summary\nconst jsonSummary = {\n    report_date: today.toISOString().split('T')[0],\n    generated_at: today.toISOString(),\n    summary: {\n        total_comments: commentStats?.total_comments || 0,\n        total_analyzed: overallStats?.total_analyzed || 0,\n        overall_sentiment_score: ((overallStats?.overall_sentiment || 0.5) * 100).toFixed(1),\n        unprocessed_comments: commentStats?.unprocessed_comments || 0\n    },\n    team_rankings: (teamComparison?.teams || []).slice(0, 5).map((team, index) => ({\n        rank: index + 1,\n        team_name: team.team_name,\n        sentiment_score: (team.avg_sentiment * 100).toFixed(1),\n        total_comments: team.total_comments\n    })),\n    sentiment_breakdown: overallStats?.sentiment_breakdown || {},\n    source_breakdown: commentStats?.source_breakdown || {}\n};\n\nreturn {\n    json: {\n        html_report: htmlReport,\n        json_summary: jsonSummary,\n        report_title: `Günlük Taraftar Analizi Raporu - ${today.toLocaleDateString('tr-TR')}`\n    }\n};"
+      },
+      "name": "Generate Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "chatId": "={{$env.TELEGRAM_CHAT_ID}}",
+        "text": "📊 *Günlük Taraftar Duygu Analizi Raporu*\n\n📅 *Tarih:* {{new Date().toLocaleDateString('tr-TR')}}\n\n📈 *Genel Durum:*\n• Toplam Yorum: {{$json.json_summary.summary.total_comments.toLocaleString()}}\n• Analiz Edilen: {{$json.json_summary.summary.total_analyzed.toLocaleString()}}\n• Genel Duygu Skoru: {{$json.json_summary.summary.overall_sentiment_score}}%\n• İşlenmemiş: {{$json.json_summary.summary.unprocessed_comments.toLocaleString()}}\n\n🏆 *Top 3 Takım:*\n{{$json.json_summary.team_rankings.slice(0,3).map(team => `${team.rank}. ${team.team_name}: ${team.sentiment_score}%`).join('\\n')}}\n\n🎭 *Duygu Dağılımı:*\n😊 Pozitif: {{($json.json_summary.sentiment_breakdown.POSITIVE || 0).toLocaleString()}}\n😐 Nötr: {{($json.json_summary.sentiment_breakdown.NEUTRAL || 0).toLocaleString()}}\n😞 Negatif: {{($json.json_summary.sentiment_breakdown.NEGATIVE || 0).toLocaleString()}}\n\n🤖 _Otomatik rapor_",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "name": "Send Telegram Summary",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        900,
+        200
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "1",
+          "name": "Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2",
+        "to": "={{$env.REPORT_EMAIL_TO}}",
+        "subject": "{{$json.report_title}}",
+        "emailType": "html",
+        "message": "={{$json.html_report}}"
+      },
+      "name": "Send Email Report",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 1,
+      "position": [
+        900,
+        300
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "1",
+          "name": "Gmail OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{$env.BACKEND_URL}}/api/v1/reports",
+        "requestMethod": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-API-Key",
+              "value": "={{$env.API_SECRET}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyContentType": "json",
+        "jsonBody": "={{ $json.json_summary }}"
+      },
+      "name": "Store Report",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        900,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = $input.all();\nconst telegramResult = results[0];\nconst emailResult = results[1];\nconst storeResult = results[2];\n\nconst summary = {\n    success: true,\n    report_generated_at: new Date().toISOString(),\n    notifications: {\n        telegram: telegramResult?.json ? 'sent' : 'failed',\n        email: emailResult?.json ? 'sent' : 'failed',\n        storage: storeResult?.json ? 'stored' : 'failed'\n    },\n    next_report: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()\n};\n\nconsole.log('Daily Report Generation Complete:', summary);\n\nreturn { json: summary };"
+      },
+      "name": "Log Report Status",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Daily at 8 AM": {
+      "main": [
+        [
+          {
+            "node": "Get Overall Stats",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Team Comparison",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Comment Stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Overall Stats": {
+      "main": [
+        [
+          {
+            "node": "Generate Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Team Comparison": {
+      "main": [
+        [
+          {
+            "node": "Generate Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Comment Stats": {
+      "main": [
+        [
+          {
+            "node": "Generate Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Report": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram Summary",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Email Report",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Store Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Telegram Summary": {
+      "main": [
+        [
+          {
+            "node": "Log Report Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email Report": {
+      "main": [
+        [
+          {
+            "node": "Log Report Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Report": {
+      "main": [
+        [
+          {
+            "node": "Log Report Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {},
+  "id": "4",
+  "tags": [
+    "reporting",
+    "daily",
+    "email",
+    "telegram"
+  ]
+}

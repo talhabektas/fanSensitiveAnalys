@@ -1,0 +1,44 @@
+{
+  "teams": [
+    {
+      "name": "Galatasaray",
+      "slug": "galatasaray", 
+      "keywords": ["galatasaray", "sarı kırmızı", "aslan", "cimbom", "gs", "gala"],
+      "logo_url": "https://example.com/galatasaray.png",
+      "colors": {
+        "primary": "#FFA500",
+        "secondary": "#DC143C"
+      }
+    },
+    {
+      "name": "Fenerbahçe", 
+      "slug": "fenerbahce",
+      "keywords": ["fenerbahçe", "sarı lacivert", "kanarya", "fener", "fb"],
+      "logo_url": "https://example.com/fenerbahce.png", 
+      "colors": {
+        "primary": "#004F9F",
+        "secondary": "#FFFF00"
+      }
+    },
+    {
+      "name": "Beşiktaş",
+      "slug": "besiktas",
+      "keywords": ["beşiktaş", "siyah beyaz", "kartal", "bjk", "beşik"],
+      "logo_url": "https://example.com/besiktas.png",
+      "colors": {
+        "primary": "#000000", 
+        "secondary": "#FFFFFF"
+      }
+    },
+    {
+      "name": "Trabzonspor",
+      "slug": "trabzonspor", 
+      "keywords": ["trabzonspor", "bordo mavi", "fırtına", "ts", "trabzon"],
+      "logo_url": "https://example.com/trabzonspor.png",
+      "colors": {
+        "primary": "#800080",
+        "secondary": "#00BFFF"
+      }
+    }
+  ]
+}
