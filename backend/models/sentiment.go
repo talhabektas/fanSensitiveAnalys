@@ -101,7 +101,9 @@ type SentimentSourceStats struct {
 }
 
 type SentimentStats struct {
-	TotalAnalyzed      int64                         `json:"total_analyzed"`
+	TotalComments      int64                         `json:"total_comments"`      // Toplam yorum sayısı
+	TotalAnalyzed      int64                         `json:"total_analyzed"`      // Analiz edilmiş yorum sayısı
+	TeamComments       map[string]int64              `json:"team_comments"`       // Takım bazında yorum sayıları
 	OverallSentiment   float64                       `json:"overall_sentiment"`
 	SentimentBreakdown map[string]int64              `json:"sentiment_breakdown"`
 	ConfidenceStats    ConfidenceStats               `json:"confidence_stats"`

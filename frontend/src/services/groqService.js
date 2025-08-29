@@ -106,7 +106,8 @@ export const categoryColors = {
   'Takım Performansı': '#3B82F6',
   'Oyuncu Eleştirisi': '#EF4444', 
   'Hakem Kararları': '#F59E0B',
-  'Transfer Haberleri': '#10B981',
+  'Transfer Haberleri': '#8B0000', // Bordo
+  'Takım Haberleri': '#4169E1',   // Mavi
   'Teknik Direktör': '#8B5CF6',
   'Genel': '#6B7280',
 };

@@ -185,7 +185,7 @@ export const Dashboard = () => {
   const statsCards = [
     {
       title: 'Toplam Yorum',
-      value: commentStats?.total_comments || 0,
+      value: dashboardData?.overall_stats?.total_comments || 0,
       change: '+12%',
       trend: 'up',
       icon: MessageSquare,
@@ -193,7 +193,7 @@ export const Dashboard = () => {
     },
     {
       title: 'İşlenen Yorum',
-      value: commentStats?.processed_comments || 0,
+      value: dashboardData?.overall_stats?.total_analyzed || 0,
       change: '+8%',
       trend: 'up',
       icon: Activity,
@@ -210,7 +210,7 @@ export const Dashboard = () => {
     },
     {
       title: 'Aktif Takım',
-      value: teamComparison?.teams?.length || 0,
+      value: dashboardData?.team_comparison?.length || 0,
       change: '0%',
       trend: 'stable',
       icon: Users,
@@ -388,9 +388,9 @@ export const Dashboard = () => {
                 </div>
               ))}
             </div>
-          ) : teamComparison?.teams?.length > 0 ? (
+          ) : dashboardData?.team_comparison?.length > 0 ? (
             <div className="space-y-4">
-              {teamComparison.teams.slice(0, 5).map((team, index) => (
+              {dashboardData.team_comparison.slice(0, 5).map((team, index) => (
                 <div key={team.team_id} className="flex items-center justify-between p-3 rounded-lg border border-gray-200">
                   <div className="flex items-center space-x-3">
                     <div className="flex items-center space-x-2">

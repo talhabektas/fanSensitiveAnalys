@@ -100,7 +100,8 @@ func (rs *ReportService) GenerateOverallStats() (*models.SentimentStats, error) 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
-	pipeline := []bson.M{
+	// Sentiment stats from sentiments collection
+	sentimentPipeline := []bson.M{
 		{
 			"$group": bson.M{
 				"_id":                nil,
@@ -117,13 +118,13 @@ func (rs *ReportService) GenerateOverallStats() (*models.SentimentStats, error) 
 		},
 	}
 
-	cursor, err := rs.sentimentsCollection.Aggregate(ctx, pipeline)
+	cursor, err := rs.sentimentsCollection.Aggregate(ctx, sentimentPipeline)
 	if err != nil {
-		return nil, fmt.Errorf("error aggregating overall stats: %w", err)
+		return nil, fmt.Errorf("error aggregating sentiment stats: %w", err)
 	}
 	defer cursor.Close(ctx)
 
-	var result []struct {
+	var sentimentResult []struct {
 		TotalAnalyzed     int64   `bson:"total_analyzed"`
 		OverallSentiment  float64 `bson:"overall_sentiment"`
 		AvgConfidence     float64 `bson:"avg_confidence"`
@@ -135,17 +136,78 @@ func (rs *ReportService) GenerateOverallStats() (*models.SentimentStats, error) 
 		LowConfidence     int64   `bson:"low_confidence"`
 	}
 
-	if err = cursor.All(ctx, &result); err != nil {
-		return nil, fmt.Errorf("error decoding overall stats: %w", err)
+	if err = cursor.All(ctx, &sentimentResult); err != nil {
+		return nil, fmt.Errorf("error decoding sentiment stats: %w", err)
+	}
+
+	// Get total comments count from comments collection
+	totalComments, err := rs.commentsCollection.CountDocuments(ctx, bson.M{})
+	if err != nil {
+		log.Printf("Error getting total comments count: %v", err)
+		totalComments = 0
+	}
+
+	// Get comment counts per team
+	teamCommentsPipeline := []bson.M{
+		{
+			"$group": bson.M{
+				"_id":   "$team_id",
+				"count": bson.M{"$sum": 1},
+			},
+		},
+		{
+			"$lookup": bson.M{
+				"from":         "teams",
+				"localField":   "_id",
+				"foreignField": "_id",
+				"as":           "team",
+			},
+		},
+		{
+			"$unwind": "$team",
+		},
+		{
+			"$project": bson.M{
+				"_id":       0,
+				"team_name": "$team.name",
+				"count":     1,
+			},
+		},
+	}
+
+	teamCursor, err := rs.commentsCollection.Aggregate(ctx, teamCommentsPipeline)
+	if err != nil {
+		log.Printf("Error getting team comment counts: %v", err)
+	}
+	
+	var teamComments []struct {
+		TeamName string `bson:"team_name"`
+		Count    int64  `bson:"count"`
+	}
+	
+	if teamCursor != nil {
+		defer teamCursor.Close(ctx)
+		if err = teamCursor.All(ctx, &teamComments); err != nil {
+			log.Printf("Error decoding team comment counts: %v", err)
+		}
 	}
 
 	stats := &models.SentimentStats{
 		SentimentBreakdown: make(map[string]int64),
 		ModelPerformance:   make(map[string]models.ModelPerformance),
+		TeamComments:       make(map[string]int64), // Yeni field
 	}
 
-	if len(result) > 0 {
-		r := result[0]
+	// Set total comments count (from comments collection)
+	stats.TotalComments = totalComments
+
+	// Set team comment counts
+	for _, teamComment := range teamComments {
+		stats.TeamComments[teamComment.TeamName] = teamComment.Count
+	}
+
+	if len(sentimentResult) > 0 {
+		r := sentimentResult[0]
 		stats.TotalAnalyzed = r.TotalAnalyzed
 		stats.OverallSentiment = r.OverallSentiment
 		stats.SentimentBreakdown["POSITIVE"] = r.PositiveCount

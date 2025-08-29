@@ -159,7 +159,7 @@ export const RealtimeMonitor = () => {
             <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
               <div className="flex items-center space-x-3">
                 <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                <span className="font-medium text-green-800">Groq AI</span>
+                <span className="font-medium text-green-800">Grok AI</span>
               </div>
               <span className="text-green-600 text-sm">Aktif</span>
             </div>
